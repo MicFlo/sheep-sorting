@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sheep Farm Sorting Game</title>
+  <style>
+    body {
+      margin: 0;
+      background: #e6f2d6;
+      font-family: 'Segoe UI', sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+    h1 {
+      margin-top: 24px;
+      color: #4a7c2c;
+    }
+    #gameCanvas {
+      background: #fff;
+      border: 4px solid #4a7c2c;
+      border-radius: 16px;
+      margin-top: 24px;
+      display: block;
+      width: 100vw;
+      max-width: 100vw;
+      height: 500px;
+    }
+    #instructions {
+      margin-top: 16px;
+      color: #333;
+      font-size: 1.1em;
+      max-width: 900px;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <h1>Sheep Farm Sorting Game</h1>
+  <canvas id="gameCanvas" width="800" height="500"></canvas>
+  <div id="instructions">
+    Use <b>Left</b> and <b>Right</b> arrow keys to control the sorting door.<br>
+    <span style="color:#e75480;font-weight:bold;">BABY LAMBS</span> are <span style="color:#ffe0f0;">pink</span> with a heart icon — send them to the left area.<br>
+    <span style="color:#2c54b5;font-weight:bold;">SHEEP</span> are <span style="color:#b3d1ff;">blue</span> with a star icon — let them go straight ahead!<br>
+    <b>Press SPACE to pause/resume the game at any time.</b><br>
+    The game ends when you reach 20 points. <b>Press SPACE</b> to restart after game over.
+  </div>
+  <script src="game.js"></script>
+  <script>
+    // Make canvas always match window width
+    function resizeCanvas() {
+      const canvas = document.getElementById('gameCanvas');
+      canvas.width = window.innerWidth;
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+  </script>
+</body>
+</html> 
