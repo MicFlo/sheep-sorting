@@ -335,58 +335,41 @@ function drawFarm() {
 function drawSheep() {
   for (const sheep of sheepList) {
     // 8-bit: blocky rectangles, pixel clusters
-    let bodyWidth, bodyHeight, headWidth, headHeight, legWidth, legHeight, fluffCount, fluffRadius, bodyColor, fluffColor;
-    if (sheep.type === 'lamb') {
-      bodyWidth = 24;
-      bodyHeight = 16;
-      headWidth = 10;
-      headHeight = 12;
-      legWidth = 4;
-      legHeight = 6;
-      fluffCount = 8;
-      fluffRadius = 10;
-      bodyColor = '#d3d3d3'; // light grey
-      fluffColor = '#e5e5e5'; // lighter grey for fluff
-    } else {
-      bodyWidth = 48;
-      bodyHeight = 32;
-      headWidth = 20;
-      headHeight = 24;
-      legWidth = 8;
-      legHeight = 12;
-      fluffCount = 16;
-      fluffRadius = 20;
-      bodyColor = '#fff';
-      fluffColor = '#fff';
+
+    // If poofing, draw a shrinking/fading sheep and a cloud
+    if (sheep.poofing) {
+      const poofProgress = Math.min(sheep.poofTime / 0.4, 1); // 0..1
+      const scale = 1 - poofProgress; // Shrinks from 1 to 0
+      ctx.save();
+      ctx.globalAlpha = 1 - poofProgress; // Fade out
+
+      ctx.translate(sheep.x, sheep.y);
+
+      // Draw a simple "poof" cloud (circle/oval with white border)
+      ctx.beginPath();
+      ctx.arc(0, 0, 18 * scale + 8, 0, Math.PI * 2);
+      ctx.fillStyle = '#fff';
+      ctx.globalAlpha = 0.8 * (1 - poofProgress);
+      ctx.fill();
+      ctx.globalAlpha = 1 - poofProgress;
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = '#ddd';
+      ctx.stroke();
+
+      // Draw the sheep scaled down
+      ctx.scale(scale, scale);
+      ctx.globalAlpha = 1 - poofProgress;
+      drawSheepSprite(0, 0, sheep.type, false);
+
+      ctx.restore();
+      continue;
     }
-    // Fluffy border (8-bit: small blocks)
-    ctx.fillStyle = fluffColor;
-    for (let i = 0; i < fluffCount; i++) {
-      const angle = (2 * Math.PI * i) / fluffCount;
-      const fx = Math.round(sheep.x + Math.cos(angle) * fluffRadius);
-      const fy = Math.round(sheep.y + Math.sin(angle) * (fluffRadius * 0.7));
-      ctx.fillRect(fx - 4, fy - 3, 8, 6);
-    }
-    // Body (blocky)
-    ctx.fillStyle = bodyColor;
-    ctx.fillRect(Math.round(sheep.x) - bodyWidth/2, Math.round(sheep.y) - bodyHeight/2, bodyWidth, bodyHeight);
-    // Head (blocky)
-    ctx.fillStyle = '#b5a27a';
-    ctx.fillRect(Math.round(sheep.x) + bodyWidth/2 - 4, Math.round(sheep.y) - headHeight/2 + 2, headWidth, headHeight);
-    // Legs (blocky)
-    ctx.fillStyle = '#444';
-    for (let i = 0; i < 4; i++) {
-      ctx.fillRect(Math.round(sheep.x) - bodyWidth/2 + 4 + i*(bodyWidth-12)/3, Math.round(sheep.y) + bodyHeight/2 - 1, legWidth, legHeight);
-    }
-    // Eyes (blocky)
-    ctx.fillStyle = '#fff';
-    ctx.fillRect(Math.round(sheep.x) + bodyWidth/2 + 2, Math.round(sheep.y) - 2, 3, 3);
-    ctx.fillRect(Math.round(sheep.x) + bodyWidth/2 + 6, Math.round(sheep.y) - 2, 3, 3);
-    ctx.fillStyle = '#222';
-    ctx.fillRect(Math.round(sheep.x) + bodyWidth/2 + 3, Math.round(sheep.y) - 1, 1, 1);
-    ctx.fillRect(Math.round(sheep.x) + bodyWidth/2 + 7, Math.round(sheep.y) - 1, 1, 1);
+
+    // Draw regular sheep
+    drawSheepSprite(sheep.x, sheep.y, sheep.type, false);
   }
 }
+
 
 function resetGame() {
   sheepList = [];
@@ -439,24 +422,46 @@ function updateSheep() {
   const lambArea = getLambArea();
   const sheepAreaX = canvas.width - SHEEP_AREA_WIDTH;
   for (const sheep of sheepList) {
-    if (sheep.sorted) continue;
+    if (sheep.sorted && !sheep.poofing) continue;
+
+    // Handle "poof" animation for wrongly sorted sheep
+    if (sheep.poofing) {
+      sheep.poofTime += 1 / 60; // ~frames to seconds
+      if (sheep.poofTime > 0.4) { // Poof duration: 0.4 seconds
+        sheep.sorted = true;
+        sheep.poofing = false;
+      }
+      continue; // Don't move while poofing
+    }
+
     // Move sheep forward
     sheep.x += sheep.speed;
-    // At door
+
+    // At door (not yet assigned a path)
     if (sheep.x > doorX && !sheep.sorted) {
-      if (doorPosition === 'straight' && sheep.type === 'sheep') {
-        // Let sheep go straight
+      if (!sheep.sortPath) {
+        if (doorPosition === 'straight' && sheep.type === 'sheep') {
+          sheep.sortPath = 'straight';
+        } else if (doorPosition === 'left' && sheep.type === 'lamb') {
+          sheep.sortPath = 'left';
+        } else {
+          sheep.sortPath = 'wrong';
+          sheep.poofing = true;
+          sheep.poofTime = 0;
+          missed++;
+          continue; // Trigger poof animation, stop logic here
+        }
+      }
+      // Follow assigned path
+      if (sheep.sortPath === 'straight') {
         sheep.x += sheep.speed * 2;
-        // Let sheep go well inside the sheep area before sorting
         if (sheep.x > sheepAreaX + 30) {
           sheep.sorted = true;
           score++;
         }
-      } else if (doorPosition === 'left' && sheep.type === 'lamb') {
-        // Redirect lamb to top
+      } else if (sheep.sortPath === 'left') {
         sheep.y -= 4;
         sheep.x += 1;
-        // Let lamb go well inside the lamb area before sorting
         if (
           sheep.y < lambArea.y + lambArea.height - 20 &&
           sheep.y > lambArea.y &&
@@ -466,23 +471,17 @@ function updateSheep() {
           sheep.sorted = true;
           score++;
         }
-      } else if (
-        (doorPosition === 'straight' && sheep.type === 'lamb') ||
-        (doorPosition === 'left' && sheep.type === 'sheep')
-      ) {
-        // Wrong sorting
-        missed++;
-        sheep.sorted = true;
       }
     }
+
     // Out of bounds
     if (sheep.x > canvas.width + 50 || sheep.y < 0) {
       sheep.sorted = true;
       missed++;
     }
   }
-  // Remove sorted sheep
-  sheepList = sheepList.filter(s => !s.sorted || s.x < canvas.width + 50);
+  // Remove sorted sheep (and poofed ones)
+  sheepList = sheepList.filter(s => !s.sorted || (s.poofing && !s.sorted));
 }
 
 function drawScore() {
